@@ -55,7 +55,7 @@ namespace CaseActualDaysCalculator
 
                         QueryExpression q = new QueryExpression("calendar") { NoLock = true };
                         q.Criteria.AddCondition("type", ConditionOperator.Equal, 2);
-                        q.Criteria.AddCondition("name", ConditionOperator.Equal, "Holiday Schedule");
+                        q.Criteria.AddCondition("name", ConditionOperator.Equal, "Bank Holidays");
 
 
                         EntityCollection businessClosureCalendars = service.RetrieveMultiple(q);
@@ -70,7 +70,7 @@ namespace CaseActualDaysCalculator
                         var neededDates = service.Retrieve("incident", Id, new ColumnSet("createdon", "modifiedon"));
 
                         List<DateTime> allDatesInbetween = new List<DateTime>();
-                        var startDate = Convert.ToDateTime(neededDates.Attributes["createdon"]).Date;
+                        var startDate = Convert.ToDateTime(neededDates.Attributes["new_ltc_received_date"]).Date;
                         var endDate = Convert.ToDateTime(neededDates.Attributes["modifiedon"]).Date;
 
 
@@ -100,7 +100,7 @@ namespace CaseActualDaysCalculator
                         {
                             Id = entity.Id
                         };
-                        updateEntity["new_noofdaystakentoresolve"] = actualNumberOfDays;
+                        updateEntity["tisski_noofdaystakentoresolve"] = actualNumberOfDays;
                         service.Update(updateEntity);
 
                     }
