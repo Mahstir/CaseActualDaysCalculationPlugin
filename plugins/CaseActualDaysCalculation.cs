@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.ServiceModel;
 
 namespace CaseActualDaysCalculator
 {
@@ -95,15 +96,22 @@ namespace CaseActualDaysCalculator
 
                         var actualNumberOfDays = allDatesInbetween.Count();
 
-                        Entity updateEntity = new Entity("incident");
-                        updateEntity.Id = entity.Id;
+                        Entity updateEntity = new Entity("incident")
+                        {
+                            Id = entity.Id
+                        };
                         updateEntity["new_noofdaystakentoresolve"] = actualNumberOfDays;
                         service.Update(updateEntity);
 
                     }
+                    catch (FaultException<OrganizationServiceFault> ex)
+                    {
+                        tracingService.Trace("Number of Days taken to resolve: {0}", ex.ToString());
+                        throw new InvalidPluginExecutionException("An error occurred in the CaseActualDaysCalculation plug-in.", ex);
+                    }
                     catch (Exception ex)
                     {
-                        tracingService.Trace("FollowUpPlugin: {0}", ex.ToString());
+                        tracingService.Trace("CaseActualDaysCalculationPlugin: {0}", ex.ToString());
                         throw;
                     }
 
