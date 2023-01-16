@@ -1,13 +1,8 @@
-﻿using Microsoft.Crm.Sdk.Messages;
-using Microsoft.Xrm.Sdk;
+﻿using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
-using Microsoft.Xrm.Sdk.PluginTelemetry;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.ServiceModel;
 
 namespace CaseActualDaysCalculator
@@ -25,7 +20,7 @@ namespace CaseActualDaysCalculator
             IPluginExecutionContext context = (IPluginExecutionContext)
                 serviceProvider.GetService(typeof(IPluginExecutionContext));
 
-            
+
 
             // The InputParameters collection contains all the data passed in the message request.  
             if (context.InputParameters.Contains("Target") &&
@@ -41,15 +36,17 @@ namespace CaseActualDaysCalculator
                     (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
                 IOrganizationService service = serviceFactory.CreateOrganizationService(context.UserId);
 
-                var status = service.Retrieve("incident", Id, new ColumnSet("statecode"));
-                var caseStatus = status.GetAttributeValue<OptionSetValue>("statecode").Value;
+                tracingService.Trace("Getting Case state");
+                var caseStatus = entity.GetAttributeValue<OptionSetValue>("statecode").Value;
+                tracingService.Trace("Case status is {0}", caseStatus);
 
-                if (caseStatus == 1) { 
-                    
+                if (caseStatus == 1)
+                {
+
                     try
                     {
 
-
+                        tracingService.Trace("Retrieving Holidays");
                         var calendarRules = new List<Entity>();
                         Entity businessClosureCalendar = null;
 
@@ -62,18 +59,36 @@ namespace CaseActualDaysCalculator
 
                         if (businessClosureCalendars.Entities.Count > 0)
                         {
+                            tracingService.Trace("Holidays");
+
                             businessClosureCalendar = businessClosureCalendars.Entities[0];
                             calendarRules = businessClosureCalendar.GetAttributeValue<EntityCollection>("calendarrules").Entities.ToList();
 
                         }
 
-                        var neededDates = service.Retrieve("incident", Id, new ColumnSet("createdon", "modifiedon"));
+
+                        tracingService.Trace("Retrieving received and actual resolved dates");
+
+                        var neededDates = service.Retrieve("incident", Id, new ColumnSet("new_ltc_received_date", "new_ltc_actual_resolved_date", "ticketnumber"));
+
+                        tracingService.Trace("Checking Dates exist for {0}", neededDates.Attributes["ticketnumber"]);
+                        if (!neededDates.Contains("new_ltc_actual_resolved_date"))
+                        {
+                            throw new InvalidPluginExecutionException("Actual Resolved date is required");
+                        }
+
+                        tracingService.Trace("Initialising Dates");
 
                         List<DateTime> allDatesInbetween = new List<DateTime>();
+
                         var startDate = Convert.ToDateTime(neededDates.Attributes["new_ltc_received_date"]).Date;
-                        var endDate = Convert.ToDateTime(neededDates.Attributes["modifiedon"]).Date;
+                        tracingService.Trace("Start date: {0}", startDate);
+
+                        var endDate = Convert.ToDateTime(neededDates.Attributes["new_ltc_actual_resolved_date"]).Date;
+                        tracingService.Trace("Start date: {0}", endDate);
 
 
+                        tracingService.Trace("Excluding weekends from dates in between");
                         for (var date = startDate; date <= endDate; date = date.AddDays(1))
                         {
 
@@ -83,8 +98,8 @@ namespace CaseActualDaysCalculator
                             }
 
                         }
-                       
 
+                        tracingService.Trace("Exclusing holidays from days in between");
                         foreach (var holidayDate in calendarRules)
                         {
 
@@ -96,11 +111,12 @@ namespace CaseActualDaysCalculator
 
                         var actualNumberOfDays = allDatesInbetween.Count();
 
+                        tracingService.Trace("Updating Incident");
                         Entity updateEntity = new Entity("incident")
                         {
                             Id = entity.Id
                         };
-                        updateEntity["tisski_noofdaystakentoresolve"] = actualNumberOfDays;
+                        updateEntity["tisski_noofworkingdaystakentoresolve"] = actualNumberOfDays;
                         service.Update(updateEntity);
 
                     }
@@ -116,7 +132,7 @@ namespace CaseActualDaysCalculator
                     }
 
 
-               }
+                }
             }
 
         }
